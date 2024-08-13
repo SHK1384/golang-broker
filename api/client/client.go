@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"github.com/gammazero/workerpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"log"
@@ -18,33 +19,53 @@ func main() {
 	defer conn.Close()
 	client := pb.NewBrokerClient(conn)
 
-	//ticker := time.NewTicker(10 * time.Second)
-	//defer ticker.Stop()
 	//var wg sync.WaitGroup
-	//for {
+	//for i := 0; i < 1000000; i++ {
+	//	wg.Add(1)
+	//	go func() {
+	//		defer wg.Done()
+	//		_, err := client.Publish(context.Background(), &pb.PublishRequest{Body: "world", Subject: "ali", ExpirationSeconds: 0})
+	//		if err != nil {
+	//			panic(err)
+	//		}
+	//	}()
+	//}
+	//wg.Wait()
+
+	wp := workerpool.New(10000)
+	for i := 0; i < 1000000; i++ {
+		wp.Submit(func() {
+			_, err = client.Publish(context.Background(), &pb.PublishRequest{Body: "world", Subject: "ali", ExpirationSeconds: 0})
+			if err != nil {
+				panic(err)
+			}
+		})
+	}
+	wp.StopWait()
+	//ticker := time.NewTicker(5 * time.Second)
+	//timer := time.NewTimer(15 * time.Second)
+	//
+	//condition := true
+	//for condition {
 	//	select {
+	//	case <-timer.C:
+	//		condition = false
 	//	case <-ticker.C:
-	//		wg.Wait()
-	//		return
-	//	default:
-	//		wg.Add(1)
-	//		go func() {
-	//			defer wg.Done()
-	//			_, err := client.Publish(context.Background(), &pb.PublishRequest{Body: []byte("world"), Subject: "ali", ExpirationSeconds: 0})
+	//		workerPool.SubmitJob(func() {
+	//			_, err = client.Publish(context.Background(), &pb.PublishRequest{Body: "world", Subject: "ali", ExpirationSeconds: 0})
 	//			if err != nil {
 	//				panic(err)
 	//			}
-	//		}()
+	//		})
 	//	}
 	//}
 
-	for i := 0; i < 1000000; i++ {
-		_, err := client.Publish(context.Background(), &pb.PublishRequest{Body: []byte("world"), Subject: "ali", ExpirationSeconds: 0})
-		if err != nil {
-			panic(err)
-		}
-	}
-
+	//for i := 0; i < 1000; i++ {
+	//	_, err = client.Publish(context.Background(), &pb.PublishRequest{Body: "world", Subject: "ali", ExpirationSeconds: 0})
+	//	if err != nil {
+	//		panic(err)
+	//	}
+	//}
 	//cnt := 0
 	//for i := 0; i < 5000; i++ {
 	//	_, err := client.Publish(context.Background(), &pb.PublishRequest{Body: []byte("world"), Subject: "ali", ExpirationSeconds: 0})

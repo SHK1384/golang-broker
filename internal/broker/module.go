@@ -20,8 +20,7 @@ type Module struct {
 	muDatabase            sync.Mutex
 	messagesChannels      map[string][]chan broker.Message
 	db                    pg.Postgres
-	messageList           map[string][]MessageDate
-	muMessageList         sync.Mutex
+	dbType                string
 }
 
 func NewModule() broker.Broker {
@@ -29,7 +28,7 @@ func NewModule() broker.Broker {
 	if err != nil {
 		panic(err)
 	}
-	return &Module{available: true, messagesChannels: make(map[string][]chan broker.Message), db: *db, messageList: make(map[string][]MessageDate)}
+	return &Module{available: true, messagesChannels: make(map[string][]chan broker.Message), db: *db, dbType: "postgresql"}
 }
 
 func (m *Module) Close() error {
@@ -50,19 +49,18 @@ func (m *Module) Publish(ctx context.Context, subject string, msg broker.Message
 	for _, chn := range currentChannelsList {
 		chn <- msg
 	}
-	m.muDatabase.Lock()
-	id, err := m.db.InsertMessage(context.Background(), msg.Body, int(msg.Expiration.Seconds()), time.Now())
-	m.muDatabase.Unlock()
-	if err != nil {
-		return -1, err
+	if m.dbType == "postgresql" {
+		m.muDatabase.Lock()
+		err := m.db.InsertMessage(context.Background(), msg.Body, int(msg.Expiration.Seconds()), time.Now())
+		m.muDatabase.Unlock()
+		if err != nil {
+			return -1, err
+		}
+		return -1, nil
+	} else {
+		// pass
 	}
-	//m.muMessageList.Lock()
-	//msg.SetId(len(m.messageList[subject]))
-	//id := len(m.messageList[subject])
-	//message := MessageDate{subject: subject, currentTime: time.Now(), message: &msg}
-	//m.messageList[subject] = append(m.messageList[subject], message)
-	//m.muMessageList.Unlock()
-	return id, nil
+	return -1, nil
 }
 
 func (m *Module) Subscribe(ctx context.Context, subject string) (<-chan broker.Message, error) {

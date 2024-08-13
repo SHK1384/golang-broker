@@ -36,7 +36,7 @@ var methodCounter = prometheus.NewCounterVec(
 var publishLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
 	Name:    "publish_request_duration_seconds",
 	Help:    "Histogram of response time for publish handler in seconds",
-	Buckets: []float64{0, 25, 50, 100, 125, 150, 175, 200, 225, 250, 275, 300, 325, 350, 375, 400, 425, 450, 475, 500},
+	Buckets: []float64{0.005, 0.01, 0.02, 0.03, 0.04, 0.05, 0.06, 0.07, 0.08, 0.09, 0.1, 0.125, 0.15, 0.175, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
 })
 
 var subscribeLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
@@ -54,15 +54,15 @@ var fetchLatency = prometheus.NewHistogram(prometheus.HistogramOpts{
 func (s *BrokerServer) Publish(ctx context.Context, publishRequest *pb.PublishRequest) (*pb.PublishResponse, error) {
 	now := time.Now()
 	msg := broker2.Message{Expiration: time.Second * time.Duration(publishRequest.GetExpirationSeconds()), Body: string(publishRequest.GetBody())}
-	id, err := s.m.Publish(ctx, publishRequest.Subject, msg)
+	_, err := s.m.Publish(ctx, publishRequest.Subject, msg)
 	if err != nil {
 		methodCounter.With(prometheus.Labels{"method": "publish", "status": "failed"}).Inc()
 		return &pb.PublishResponse{}, err
 	}
 	methodCounter.With(prometheus.Labels{"method": "publish", "status": "successful"}).Inc()
-	publishResponse := pb.PublishResponse{Id: int32(id)}
+	publishResponse := &pb.PublishResponse{Id: int32(-1)}
 	publishLatency.Observe(float64(time.Since(now).Milliseconds()))
-	return &publishResponse, nil
+	return publishResponse, nil
 }
 
 func (s *BrokerServer) Subscribe(subscribeRequest *pb.SubscribeRequest, stream pb.Broker_SubscribeServer) error {
@@ -76,7 +76,7 @@ func (s *BrokerServer) Subscribe(subscribeRequest *pb.SubscribeRequest, stream p
 	go func() {
 		for {
 			message := <-out
-			msg := &pb.MessageResponse{Body: []byte(message.Body)}
+			msg := &pb.MessageResponse{Body: message.Body}
 			if err := stream.Send(msg); err != nil {
 				methodCounter.With(prometheus.Labels{"method": "subscribe", "status": "send_failed"}).Inc()
 			}
@@ -95,7 +95,7 @@ func (s *BrokerServer) Fetch(ctx context.Context, fetchRequest *pb.FetchRequest)
 		return &pb.MessageResponse{}, err
 	}
 	methodCounter.With(prometheus.Labels{"method": "fetch", "status": "successful"}).Inc()
-	messageResponse := &pb.MessageResponse{Body: []byte(msg.Body)}
+	messageResponse := &pb.MessageResponse{Body: msg.Body}
 	fetchLatency.Observe(float64(time.Since(now).Milliseconds()))
 	return messageResponse, nil
 }
